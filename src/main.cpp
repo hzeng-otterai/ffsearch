@@ -37,7 +37,7 @@ int main(int argc, char **argv)
     getchar();
     
     start_time = get_time();
-    std::vector<ExtractResult> extract_results;
+    std::vector<SearchResult> extract_results;
     extract_results.reserve(128);
     int iterations = 10000;
     for (int i = 0; i < iterations; ++i)

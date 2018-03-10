@@ -16,105 +16,65 @@ using namespace std;
 using namespace ffsearch;
 
 
-EntityCandidate::EntityCandidate():
-    entity_candidates_(3, 3)
+TextCandidate::TextCandidate():
+    text_candidates_(3, 3)
 {
 }
 
-void EntityCandidate::AddLeft(uint32_t id)
+void TextCandidate::AddLeft(uint32_t id)
 {
-    auto it = entity_candidates_.begin() + entity_candidates_[0];
-    entity_candidates_.insert(it, id);
-    ++entity_candidates_[0];
-    ++entity_candidates_[1];
-    ++entity_candidates_[2];
+    auto it = text_candidates_.begin() + text_candidates_[0];
+    text_candidates_.insert(it, id);
+    ++text_candidates_[0];
+    ++text_candidates_[1];
+    ++text_candidates_[2];
 }
 
-void EntityCandidate::AddMiddle(uint32_t id)
+void TextCandidate::AddMiddle(uint32_t id)
 {
-    auto it = entity_candidates_.begin() + entity_candidates_[1];
-    entity_candidates_.insert(it, id);
-    ++entity_candidates_[1];
-    ++entity_candidates_[2];
+    auto it = text_candidates_.begin() + text_candidates_[1];
+    text_candidates_.insert(it, id);
+    ++text_candidates_[1];
+    ++text_candidates_[2];
 }
 
-void EntityCandidate::AddRight(uint32_t id)
+void TextCandidate::AddRight(uint32_t id)
 {
-    auto it = entity_candidates_.begin() + entity_candidates_[2];
-    entity_candidates_.insert(it, id);
-    ++entity_candidates_[2];
+    auto it = text_candidates_.begin() + text_candidates_[2];
+    text_candidates_.insert(it, id);
+    ++text_candidates_[2];
 }
 
-uint32_t EntityCandidate::GetLeftStart() const
+uint32_t TextCandidate::GetLeftStart() const
 {
     return 3;
 }
-uint32_t EntityCandidate::GetMiddleStart() const
+uint32_t TextCandidate::GetMiddleStart() const
 {
-    return entity_candidates_[0];
+    return text_candidates_[0];
 }
-uint32_t EntityCandidate::GetRightStart() const
+uint32_t TextCandidate::GetRightStart() const
 {
-    return entity_candidates_[1];
+    return text_candidates_[1];
 }
-uint32_t EntityCandidate::GetLeftEnd() const
+uint32_t TextCandidate::GetLeftEnd() const
 {
-    return entity_candidates_[0];
+    return text_candidates_[0];
 }
-uint32_t EntityCandidate::GetMiddleEnd() const
+uint32_t TextCandidate::GetMiddleEnd() const
 {
-    return entity_candidates_[1];
+    return text_candidates_[1];
 }
-uint32_t EntityCandidate::GetRightEnd() const
+uint32_t TextCandidate::GetRightEnd() const
 {
-    return entity_candidates_[2];
-}
-
-Trie::Trie()
-{
+    return text_candidates_[2];
 }
 
-Trie::~Trie()
-{
-    for (size_t i = 0; i < data_.size(); ++i)
-        delete data_[i];
-}
-
-EntityCandidate * Trie::get(const std::string& key, size_t start, size_t end) const
-{
-    int i = da_.exactMatchSearch<int>(key.c_str() + start, end-start);
-    if (i >= 0)
-        return data_[i];
-    else
-        return NULL;
-}
-
-void Trie::update(const std::string& key, size_t start, size_t end, size_t idx, size_t pos)
-{
-    int i = da_.exactMatchSearch<int>(key.c_str() + start, end-start);
-    //cout << "Got i " << i << endl;
-    if (i<0)
-    {
-        i = data_.size();
-        da_.update(key.c_str() + start, end-start, i);
-        data_.push_back(new EntityCandidate());
-    }
-    
-    //cout << "Update node with " << i << " data size" << data.size() << endl;
-    if (pos == 0)
-        data_[i]->AddLeft(idx);
-    else if (pos == SEGMENT_NUM - 1)
-        data_[i]->AddRight(idx);
-    else
-        data_[i]->AddMiddle(idx);
-    
-    //cout << "Update node done." << endl;
-}
 
 FFSearch::FFSearch() :
-    entity_min_len_(-1), 
-    entity_max_len_(0), 
-    entity_()
+    text_min_len_(-1), 
+    text_max_len_(0), 
+    text_()
 {
 }
 
@@ -129,31 +89,31 @@ int FFSearch::CreateIndex(vector<string> && lines)
     size_t limit = min(size_t(UINT32_MAX), lines.size());
     for (size_t idx = 0; idx < limit; ++idx)
     {
-        Entity current_entity;
-        current_entity.name = move(lines[idx]);
+        Text current_text;
+        current_text.name = move(lines[idx]);
         
-        if (!current_entity.name.empty())
+        if (!current_text.name.empty())
         {
-            size_t entity_length = current_entity.name.size();
-            entity_min_len_ = min(entity_length, entity_min_len_);
-            entity_max_len_ = max(entity_length, entity_max_len_);
+            size_t text_length = current_text.name.size();
+            text_min_len_ = min(text_length, text_min_len_);
+            text_max_len_ = max(text_length, text_max_len_);
 
             // calculate segment positions
-            CalcSegPosition(entity_length, current_entity.seg_pos);
+            CalcSegPosition(text_length, current_text.seg_pos);
             
             // build trie tree
             for (size_t pos = 0; pos < SEGMENT_NUM; ++pos)
             {
-                size_t start = ((pos == 0)? 0 : current_entity.seg_pos[pos-1]);
-                size_t end = ((pos == SEGMENT_NUM-1)? entity_length : current_entity.seg_pos[pos]);
+                size_t start = ((pos == 0)? 0 : current_text.seg_pos[pos-1]);
+                size_t end = ((pos == SEGMENT_NUM-1)? text_length : current_text.seg_pos[pos]);
                 if (start == end)
                     continue;
                 //cout << "Update name " << start << " " << end << " " << idx << " " << pos << " " << endl;
-                trie_.update(current_entity.name, start, end, idx, pos);
+                UpdateTextCandidate(current_text.name, start, end, idx, pos);
             }
         }
 
-        entity_.push_back(current_entity);
+        text_.push_back(current_text);
     }
     
     return SUCCESS;
@@ -175,7 +135,7 @@ int FFSearch::CreateIndexFromFile(std::string const& file_name)
 }
 
 
-int FFSearch::Search(string const& query, size_t threshold, vector<ExtractResult> &result) const
+int FFSearch::Search(string const& query, size_t threshold, vector<SearchResult> &result) const
 {
     if (query.empty())
         return SUCCESS;
@@ -183,7 +143,7 @@ int FFSearch::Search(string const& query, size_t threshold, vector<ExtractResult
     if (threshold > THRESHOLD)
         threshold = THRESHOLD;
     
-    ExtractResultDict resultCandidate;
+    SearchResultDict resultCandidate;
     resultCandidate.reserve(128);
     
     int ret = Search(query, threshold, resultCandidate);
@@ -202,10 +162,10 @@ int FFSearch::Search(string const& query, size_t threshold, vector<ExtractResult
 
 size_t FFSearch::GetSize() const
 {
-    return entity_.size();
+    return text_.size();
 }
 
-int FFSearch::Search(string const& query, size_t threshold, ExtractResultDict &resultCandidate) const
+int FFSearch::Search(string const& query, size_t threshold, SearchResultDict &resultCandidate) const
 {
     size_t query_len = query.size();
 
@@ -224,30 +184,30 @@ int FFSearch::Search(string const& query, size_t threshold, ExtractResultDict &r
     {
         size_t middle_start = Adjust(seg_pos[0], delta_start_only[i], 0, query_len);
         
-        EntityCandidate const* left_node = trie_.get(query, 0, middle_start);
+        TextCandidate const* left_node = GetTextCandidate(query, 0, middle_start);
         
         if (left_node != NULL)
         {
             for (size_t pi = left_node->GetLeftStart() ; pi < left_node->GetLeftEnd() ; pi++)
             {
-                size_t entityId = left_node->entity_candidates_[pi];
-                Entity const & entity = entity_[entityId];
+                size_t textId = left_node->text_candidates_[pi];
+                Text const & text = text_[textId];
 
-                size_t entity_len = entity.name.size();
-                size_t entity_middle_start = entity.seg_pos[0];
+                size_t text_len = text.name.size();
+                size_t text_middle_start = text.seg_pos[0];
                 
-                if (Diff(entity_len, query_len) > threshold)
+                if (Diff(text_len, query_len) > threshold)
                     continue;
 
-                auto it = resultCandidate.find(entityId);
+                auto it = resultCandidate.find(textId);
                 
                 if (it != resultCandidate.end())
                     continue;
                 
                 size_t dist = CalcEditDistance(
-                    entity.name, 
-                    entity_middle_start, 
-                    entity_len - entity_middle_start, 
+                    text.name, 
+                    text_middle_start, 
+                    text_len - text_middle_start, 
                     query, 
                     middle_start, 
                     query_len - middle_start);
@@ -255,13 +215,13 @@ int FFSearch::Search(string const& query, size_t threshold, ExtractResultDict &r
                 //cout << dist;
                 if (dist <= threshold)
                 {
-                    ExtractResult er = ExtractResult{
-                        entityId, 
+                    SearchResult er = SearchResult{
+                        textId, 
                         dist,
-                        entity.name
+                        text.name
                     };
 
-                    resultCandidate.insert({entityId, er});
+                    resultCandidate.insert({textId, er});
                     //cout << start << " " << end << " " << " left:";
                     //cout << query.substr(start, end-start) << " dist:" << dist << endl;
                 }
@@ -276,30 +236,30 @@ int FFSearch::Search(string const& query, size_t threshold, ExtractResultDict &r
     for (int i = 0; i < 3; ++i)
     {
         size_t middle_end = Adjust(seg_pos[1], delta_end_only[i], 0, query_len);
-        EntityCandidate const* right_node = trie_.get(query, middle_end, query_len);
+        TextCandidate const* right_node = GetTextCandidate(query, middle_end, query_len);
         
         if (right_node != NULL)
         {
             for (size_t pi = right_node->GetRightStart() ; pi < right_node->GetRightEnd() ; pi++)
             {
-                size_t entityId = right_node->entity_candidates_[pi];
-                Entity const & entity = entity_[entityId];
+                size_t textId = right_node->text_candidates_[pi];
+                Text const & text = text_[textId];
 
-                size_t entity_len = entity.name.size();
-                size_t entity_middle_end = entity.seg_pos[1];
+                size_t text_len = text.name.size();
+                size_t text_middle_end = text.seg_pos[1];
 
-                if (Diff(entity_len, query_len) > threshold)
+                if (Diff(text_len, query_len) > threshold)
                     continue;
 
-                auto it = resultCandidate.find(entityId);
+                auto it = resultCandidate.find(textId);
                 
                 if (it != resultCandidate.end())
                     continue;
                 
                 size_t dist = CalcEditDistance(
-                    entity.name, 
+                    text.name, 
                     0, 
-                    entity_middle_end, 
+                    text_middle_end, 
                     query, 
                     0, 
                     middle_end);
@@ -307,12 +267,12 @@ int FFSearch::Search(string const& query, size_t threshold, ExtractResultDict &r
                 //cout << dist;
                 if (dist <= threshold)
                 {
-                    ExtractResult er = ExtractResult{
-                        entityId, 
+                    SearchResult er = SearchResult{
+                        textId, 
                         dist,
-                        entity.name
+                        text.name
                     };
-                    resultCandidate.insert({entityId, er});
+                    resultCandidate.insert({textId, er});
                     //cout << start << " " << end << " " << " right:";
                     //cout << query.substr(start, end-start) << " dist:" << dist << endl;
                 }
@@ -327,51 +287,51 @@ int FFSearch::Search(string const& query, size_t threshold, ExtractResultDict &r
     {
         size_t middle_start = Adjust(seg_pos[0], delta_start[i], 0, query_len);
         size_t middle_end = Adjust(seg_pos[1], delta_len[i], 0, query_len);
-        EntityCandidate const* middle_node = trie_.get(query, middle_start, middle_end);
+        TextCandidate const* middle_node = GetTextCandidate(query, middle_start, middle_end);
         
         if (middle_node != NULL)
         {
             for (size_t pi = middle_node->GetMiddleStart() ; pi < middle_node->GetMiddleEnd() ; pi++)
             {
-                size_t entityId = middle_node->entity_candidates_[pi];
-                Entity const & entity = entity_[entityId];
+                size_t textId = middle_node->text_candidates_[pi];
+                Text const & text = text_[textId];
 
-                size_t entity_len = entity.name.size();
-                size_t entity_middle_start = entity.seg_pos[0];
-                size_t entity_middle_end = entity.seg_pos[1];
+                size_t text_len = text.name.size();
+                size_t text_middle_start = text.seg_pos[0];
+                size_t text_middle_end = text.seg_pos[1];
                 
-                if (Diff(entity_len, query_len) > THRESHOLD)
+                if (Diff(text_len, query_len) > THRESHOLD)
                     continue;
 
-                auto it = resultCandidate.find(entityId);
+                auto it = resultCandidate.find(textId);
                 
                 if (it != resultCandidate.end())
                     continue;
                 
                 size_t dist_bwd = CalcEditDistance(
-                    entity.name, 
+                    text.name, 
                     0, 
-                    entity_middle_start, 
+                    text_middle_start, 
                     query, 
                     0, 
                     middle_start);
             
                 size_t dist_fwd = CalcEditDistance(
-                    entity.name, 
-                    entity_middle_end, 
-                    entity_len - entity_middle_end, 
+                    text.name, 
+                    text_middle_end, 
+                    text_len - text_middle_end, 
                     query, 
                     middle_end, 
                     query_len-middle_end);
                                 
                 if (dist_bwd + dist_fwd <= THRESHOLD)
                 {
-                    ExtractResult er = ExtractResult{
-                        entityId, 
+                    SearchResult er = SearchResult{
+                        textId, 
                         dist_bwd + dist_fwd,
-                        entity.name
+                        text.name
                     };
-                    resultCandidate.insert({entityId, er});
+                    resultCandidate.insert({textId, er});
                 }
             }
         }
@@ -382,9 +342,47 @@ int FFSearch::Search(string const& query, size_t threshold, ExtractResultDict &r
 
 void FFSearch::Clear()
 {
-    entity_min_len_ = -1;
-    entity_max_len_ = 0; 
-    entity_.clear();
+    text_min_len_ = -1;
+    text_max_len_ = 0; 
+    text_.clear();
+}
+
+TextCandidate * FFSearch::GetTextCandidate(const std::string& key, size_t start, size_t end) const
+{
+    auto it = da_.find(key.substr(start, end-start));
+    if (it != da_.end())
+        return data_[it->second];
+    else
+        return NULL;
+}
+
+void FFSearch::UpdateTextCandidate(const std::string& key, size_t start, size_t end, size_t idx, size_t pos)
+{
+    string subs = key.substr(start, end-start);
+    auto it = da_.find(subs);
+
+    //cout << "Got i " << i << endl;
+    int i;
+    if (it == da_.end())
+    {
+        i = data_.size();
+        da_[subs] = i;
+        data_.push_back(new TextCandidate());
+    }
+    else
+    {
+        i = it->second;
+    }
+    
+    //cout << "Update node with " << i << " data size" << data.size() << endl;
+    if (pos == 0)
+        data_[i]->AddLeft(idx);
+    else if (pos == SEGMENT_NUM - 1)
+        data_[i]->AddRight(idx);
+    else
+        data_[i]->AddMiddle(idx);
+    
+    //cout << "Update node done." << endl;
 }
 
 int FFSearch::CalcEditDistance(string const& doc1, int offset1, int len1, string const& doc2, int offset2, int len2)
