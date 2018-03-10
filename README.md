@@ -1,2 +1,5 @@
-# ffsearch
-Fast fuzzy string search
+# Fast fuzzy string search
+
+`cd src` 
+`make`
+`./ffsearch "FairView" test.txt` 
