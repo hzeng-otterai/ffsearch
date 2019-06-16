@@ -1,4 +1,4 @@
-CXX=g++-7
+CXX=g++
 CXXFLAGS=-std=c++11 -Wall -O2 -MMD -MP
 TARGET=ffsearch
 
