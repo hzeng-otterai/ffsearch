@@ -6,10 +6,10 @@
 `./ffsearch query.txt dictionary.txt`   
 
 ## Example data
-`cd test_data` 
-`./download_data.sh` 
-`../src/ffsearch noisy_entity.txt entity_name_unique.txt` 
-`../src/ffsearch noisy_query_en_1000.txt ../test_data/frequency_dictionary_en_500_000.txt` 
+`cd test_data`  
+`./download_data.sh`  
+`../src/ffsearch noisy_entity.txt entity_name_unique.txt`  
+`../src/ffsearch noisy_query_en_1000.txt ../test_data/frequency_dictionary_en_500_000.txt`  
 
 
 ## Benchmark
