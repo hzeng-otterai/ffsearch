@@ -16,48 +16,58 @@ int get_time()
     return ms.count();
 }
 
+vector<string> get_lines(const char * file_name)
+{
+    vector<string> lines;
+    ifstream file(file_name);
+
+    string str; 
+    while (std::getline(file, str))
+    {
+        lines.push_back(str);
+    }
+
+    return lines;
+
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 3)
     {
-        cout << "Usage: ffsearch <input_string> <string_file>" << endl << endl;
+        cout << "Usage: ffsearch <query_file> <dictionary_file>" << endl << endl;
         return 0;
     }
+
+    vector<string> query_lines = get_lines(argv[1]);
+    vector<string> dictionary_lines = get_lines(argv[2]);
 
     FFSearch ts;
 
     int start_time = get_time();
 
     cout << "Building index...";
-    ts.CreateIndexFromFile(argv[2]);
+    ts.CreateIndex(move(dictionary_lines));
     cout << ts.GetSize() << " strings loaded, " << get_time() - start_time << " ms used" << endl;
 
-    string test = argv[1];
-    cout << "Press any key to process input:" << test << endl;
+    cout << "Press any key to process input." << endl;
     getchar();
     
     start_time = get_time();
     std::vector<SearchResult> extract_results;
     extract_results.reserve(128);
-    int iterations = 100000;
+    int iterations = 10;
     for (int i = 0; i < iterations; ++i)
     {
         extract_results.clear();
-        ts.Search(test, 2, extract_results);
+        for (size_t i = 0; i < query_lines.size(); i++) {
+            const char * test_query = query_lines[i].c_str();
+            ts.Search(test_query, 2, extract_results);
+        }
     }
     
     int time_spent = get_time() -start_time;
-    
-    cout << "Search results:" << endl;
-    for (size_t i = 0 ; i < extract_results.size(); i++) {
-        cout << "id:"
-             << extract_results[i].id
-             << " string:\""
-             << extract_results[i].name
-             << "\" dist:" 
-             << extract_results[i].dist << endl; 
-    }
-    
-    cout << "Search done. Totally " << extract_results.size() << " results returned. " <<  (double)time_spent / iterations << " ms each query" << endl;
+
+    cout << "Search done." <<  (double)time_spent / iterations / query_lines.size() << " ms each query" << endl;
     return 0;
 }
