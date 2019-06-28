@@ -5,24 +5,24 @@
 #include <time.h>
 #include <assert.h>
 
-#include <fstream>
-
 //#include <iostream>
-
 #include "ffsearch.h"
 
 
 using namespace std;
 using namespace ffsearch;
 
-
 TextCandidate::TextCandidate():
     text_candidates_(3, 3)
 {
+    // The list of text candidates has 3 columns, but they are saved in one vector,
+    // using the first 3 elements as the starting position of each column.
+    // When the text candidates are empty, the vector contains 3 elements and each has value 3
 }
 
 void TextCandidate::AddLeft(uint32_t id)
 {
+    // insert an element to the first position of "left" column
     auto it = text_candidates_.begin() + text_candidates_[0];
     text_candidates_.insert(it, id);
     ++text_candidates_[0];
@@ -32,6 +32,7 @@ void TextCandidate::AddLeft(uint32_t id)
 
 void TextCandidate::AddMiddle(uint32_t id)
 {
+    // insert an element to the first position of "middle" column
     auto it = text_candidates_.begin() + text_candidates_[1];
     text_candidates_.insert(it, id);
     ++text_candidates_[1];
@@ -40,6 +41,7 @@ void TextCandidate::AddMiddle(uint32_t id)
 
 void TextCandidate::AddRight(uint32_t id)
 {
+    // insert an element to the first position of "right" column
     auto it = text_candidates_.begin() + text_candidates_[2];
     text_candidates_.insert(it, id);
     ++text_candidates_[2];
@@ -47,14 +49,17 @@ void TextCandidate::AddRight(uint32_t id)
 
 uint32_t TextCandidate::GetLeftStart() const
 {
+    // "left" column always starts from 3
     return 3;
 }
 uint32_t TextCandidate::GetMiddleStart() const
 {
+    // "middle" column
     return text_candidates_[0];
 }
 uint32_t TextCandidate::GetRightStart() const
 {
+    // "right" column
     return text_candidates_[1];
 }
 uint32_t TextCandidate::GetLeftEnd() const
@@ -85,7 +90,7 @@ FFSearch::~FFSearch()
 
 int FFSearch::CreateIndex(vector<string> && lines)
 {
-    // calculate segment positions
+    // limit the size of text lines
     size_t limit = min(size_t(UINT32_MAX), lines.size());
     for (size_t idx = 0; idx < limit; ++idx)
     {
@@ -105,7 +110,7 @@ int FFSearch::CreateIndex(vector<string> && lines)
             for (size_t pos = 0; pos < SEGMENT_NUM; ++pos)
             {
                 size_t start = ((pos == 0)? 0 : current_text.seg_pos[pos-1]);
-                size_t end = ((pos == SEGMENT_NUM-1)? text_length : current_text.seg_pos[pos]);
+                size_t end = ((pos == SEGMENT_NUM - 1)? text_length : current_text.seg_pos[pos]);
                 if (start == end)
                     continue;
                 //cout << "Update name " << start << " " << end << " " << idx << " " << pos << " " << endl;
@@ -119,29 +124,13 @@ int FFSearch::CreateIndex(vector<string> && lines)
     return SUCCESS;
 }
 
-int FFSearch::CreateIndexFromFile(std::string const& file_name)
-{
-    vector<string> lines;
-    ifstream file(file_name);
-
-    string str; 
-    while (std::getline(file, str))
-    {
-        lines.push_back(str);
-        //cout << str << endl;
-    }
-
-    return CreateIndex(move(lines));
-}
-
-
 int FFSearch::Search(string const& query, size_t threshold, vector<SearchResult> &result) const
 {
     if (query.empty())
         return SUCCESS;
     
-    if (threshold > THRESHOLD)
-        threshold = THRESHOLD;
+    if (threshold > MAX_EDIT_DISTANCE)
+        threshold = MAX_EDIT_DISTANCE;
     
     SearchResultDict resultCandidate;
     resultCandidate.reserve(128);
@@ -169,7 +158,7 @@ int FFSearch::Search(string const& query, size_t threshold, SearchResultDict &re
 {
     size_t query_len = query.size();
 
-    size_t seg_pos[THRESHOLD];
+    size_t seg_pos[MAX_EDIT_DISTANCE];
     CalcSegPosition(query_len, seg_pos);
     
     //delta of the middle segment
@@ -300,7 +289,7 @@ int FFSearch::Search(string const& query, size_t threshold, SearchResultDict &re
                 size_t text_middle_start = text.seg_pos[0];
                 size_t text_middle_end = text.seg_pos[1];
                 
-                if (Diff(text_len, query_len) > THRESHOLD)
+                if (Diff(text_len, query_len) > MAX_EDIT_DISTANCE)
                     continue;
 
                 auto it = resultCandidate.find(textId);
@@ -324,7 +313,7 @@ int FFSearch::Search(string const& query, size_t threshold, SearchResultDict &re
                     middle_end, 
                     query_len-middle_end);
                                 
-                if (dist_bwd + dist_fwd <= THRESHOLD)
+                if (dist_bwd + dist_fwd <= MAX_EDIT_DISTANCE)
                 {
                     SearchResult er = SearchResult{
                         textId, 
@@ -390,21 +379,21 @@ int FFSearch::CalcEditDistance(string const& doc1, int offset1, int len1, string
     
     //cout << doc1 << ":" << doc1.substr(offset1, len1) << "<==>" << doc2 << ":" << doc2.substr(offset2, len2);
 
-    if (Diff(len1, len2) > THRESHOLD)
-        return THRESHOLD+1;
+    if (Diff(len1, len2) > MAX_EDIT_DISTANCE)
+        return MAX_EDIT_DISTANCE+1;
 
     int bot = 1;
     int top = EDIT_DISTANCE_ARRAY_LEN - 1;
     int vl, vn, vt, l2;
 
     unsigned edit_distance[EDIT_DISTANCE_ARRAY_LEN];
-    edit_distance[0] = THRESHOLD + 1;
-    edit_distance[EDIT_DISTANCE_ARRAY_LEN - 1] = THRESHOLD + 1;
-    for (size_t i = 1; i < THRESHOLD + 1; ++i) {
-        edit_distance[i] = THRESHOLD + 1 - i;
+    edit_distance[0] = MAX_EDIT_DISTANCE + 1;
+    edit_distance[EDIT_DISTANCE_ARRAY_LEN - 1] = MAX_EDIT_DISTANCE + 1;
+    for (size_t i = 1; i < MAX_EDIT_DISTANCE + 1; ++i) {
+        edit_distance[i] = MAX_EDIT_DISTANCE + 1 - i;
     }
-    for (size_t i = THRESHOLD + 1; i < 2 * THRESHOLD + 2; ++i) {
-        edit_distance[i] = i - THRESHOLD - 1;
+    for (size_t i = MAX_EDIT_DISTANCE + 1; i < 2 * MAX_EDIT_DISTANCE + 2; ++i) {
+        edit_distance[i] = i - MAX_EDIT_DISTANCE - 1;
     }
 
     //update edit distance
@@ -414,23 +403,23 @@ int FFSearch::CalcEditDistance(string const& doc1, int offset1, int len1, string
         {
             vl = edit_distance[i-1]+1;
             vt = edit_distance[i+1]+1;
-            l2 = i - THRESHOLD + l1 - 2;
+            l2 = i - MAX_EDIT_DISTANCE + l1 - 2;
             vn = edit_distance[i] +
                  ((l2 >= 0 && l2 < len2) ? (doc1[offset1 + l1 - 1] != doc2[offset2 + l2]) : 1);
             edit_distance[i] = (vl > vt) ? ((vt > vn) ? vn : vt) : ((vl > vn) ? vn : vl);
         }
         for (int i = bot; i < top; ++i) {
-            if (edit_distance[bot] > THRESHOLD) bot++;
+            if (edit_distance[bot] > MAX_EDIT_DISTANCE) bot++;
             else break;
         }
         for (int i = top-1; i >= bot; --i) {
-            if (edit_distance[top - 1] > THRESHOLD) top--;
+            if (edit_distance[top - 1] > MAX_EDIT_DISTANCE) top--;
             else break;
         }
         if (bot >= top) break;
     }
-    //cout << " dist:" << edit_distance[THRESHOLD + 1 + len2 - len1] << endl;
-    return edit_distance[THRESHOLD + 1 + len2 - len1];
+    //cout << " dist:" << edit_distance[MAX_EDIT_DISTANCE + 1 + len2 - len1] << endl;
+    return edit_distance[MAX_EDIT_DISTANCE + 1 + len2 - len1];
 }
 
 void FFSearch::CalcSegPosition(size_t len, size_t *seg_pos)

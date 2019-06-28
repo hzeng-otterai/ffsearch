@@ -28,7 +28,6 @@ vector<string> get_lines(const char * file_name)
     }
 
     return lines;
-
 }
 
 int main(int argc, char **argv)
@@ -54,20 +53,33 @@ int main(int argc, char **argv)
     getchar();
     
     start_time = get_time();
-    std::vector<SearchResult> extract_results;
-    extract_results.reserve(128);
-    int iterations = 10;
-    for (int i = 0; i < iterations; ++i)
+    size_t nb_queries = query_lines.size();
+    std::vector<std::vector<SearchResult>> extract_results(nb_queries);
+
+    int iterations = 1000;
+    for (size_t i = 0; i < nb_queries; i++)
     {
-        extract_results.clear();
-        for (size_t i = 0; i < query_lines.size(); i++) {
+        extract_results[i].reserve(128);
+        for (int j = 0; j < iterations; j++)
+        {
+            extract_results[i].clear();
             const char * test_query = query_lines[i].c_str();
-            ts.Search(test_query, 2, extract_results);
+            ts.Search(test_query, 2, extract_results[i]);
         }
     }
     
-    int time_spent = get_time() -start_time;
+    int time_spent = get_time() - start_time;
 
-    cout << "Search done." <<  (double)time_spent / iterations / query_lines.size() << " ms each query" << endl;
+    cout << "Search done. " <<  (double)time_spent / iterations / query_lines.size() << " ms each query" << endl;
+
+    for(size_t i = 0; i < nb_queries; ++i)
+    {
+        cout << "Results for query: " << query_lines[i] << "(" << extract_results[i].size() << ")" << endl;
+        for(size_t j = 0; j < extract_results[i].size(); j++)
+        {
+            cout << "  " << extract_results[i][j].name << "\t" << extract_results[i][j].dist << endl;
+        }
+    }
+
     return 0;
 }
