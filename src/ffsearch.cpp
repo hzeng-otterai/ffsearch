@@ -182,10 +182,9 @@ int FFSearch::Search(string const& query, size_t threshold, vector<SearchResult>
         size_t end = left_node->GetLeftEnd();
         if (start == end) continue;
 
-
         start = LowerBound(left_node, start, end, query_len, threshold);
         //cout << end - start << " candidates found in left node." << endl;
-        for (size_t pi = start ; pi < end; pi++)
+        for (size_t pi = start; pi < end; pi++)
         {
             size_t textId = left_node->text_candidates_[pi];
             Text const & text = text_[textId];
@@ -217,8 +216,7 @@ int FFSearch::Search(string const& query, size_t threshold, vector<SearchResult>
         }
     }
     
-    if (threshold == 0)
-        return SUCCESS;
+    if (threshold == 0) return SUCCESS;
     
     for (int i = 0; i < 3; ++i)
     {
@@ -232,7 +230,7 @@ int FFSearch::Search(string const& query, size_t threshold, vector<SearchResult>
         
         start = LowerBound(right_node, start, end, query_len, threshold);
         //cout << end - start << " candidates found in right node." << endl;
-        for (size_t pi = start ; pi < end; pi++)
+        for (size_t pi = start; pi < end; pi++)
         {
             size_t textId = right_node->text_candidates_[pi];
             Text const & text = text_[textId];
@@ -265,8 +263,7 @@ int FFSearch::Search(string const& query, size_t threshold, vector<SearchResult>
         }
     }
     
-    if (threshold == 1)
-        return SUCCESS;
+    if (threshold == 1) return SUCCESS;
     
     for (int i = 0; i < 7; ++i)
     {
@@ -330,7 +327,7 @@ TextCandidate const* FFSearch::GetTextCandidate(const std::string& key, size_t s
 {
     auto it = da_.find(key.substr(start, end-start));
     if (it != da_.end())
-        return &(data_[it->second]);
+        return &(it->second);
     else
         return NULL;
 }
@@ -367,25 +364,18 @@ void FFSearch::UpdateTextCandidate(const std::string& key, size_t start, size_t 
     auto it = da_.find(subs);
 
     //cout << "Got i " << i << endl;
-    int i;
     if (it == da_.end())
     {
-        i = data_.size();
-        da_[subs] = i;
-        data_.push_back(TextCandidate());
-    }
-    else
-    {
-        i = it->second;
+        it = da_.insert(make_pair(subs, TextCandidate())).first;
     }
     
     //cout << "Update node with " << i << " data size" << data.size() << endl;
     if (pos == 0)
-        data_[i].AddLeft(idx);
+        it->second.AddLeft(idx);
     else if (pos == SEGMENT_NUM - 1)
-        data_[i].AddRight(idx);
+        it->second.AddRight(idx);
     else
-        data_[i].AddMiddle(idx);
+        it->second.AddMiddle(idx);
     
     //cout << "Update node done." << endl;
 }

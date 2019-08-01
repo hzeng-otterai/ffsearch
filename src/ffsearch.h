@@ -72,14 +72,11 @@ private:
 
     // list of text
     std::vector<Text> text_;
-    
-    // list of text candidates
-    std::vector<TextCandidate> data_;
 
     // the mapping of text segments to the text candidates,
     // each text candidate structure contains the IDs of those texts 
     // containing the text segments as prefix, infix and suffix
-    std::unordered_map<std::string, int> da_;
+    std::unordered_map<std::string, TextCandidate> da_;
     
 private:
     // Get the text candidates for a segment of the query string
