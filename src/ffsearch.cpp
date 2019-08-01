@@ -4,6 +4,7 @@
 #include <cmath>
 #include <time.h>
 #include <assert.h>
+#include <unordered_set>
 
 //#include <iostream>
 #include "ffsearch.h"
@@ -92,58 +93,51 @@ int FFSearch::CreateIndex(vector<string> && lines)
 {
     // limit the size of text lines
     size_t limit = min(size_t(UINT32_MAX), lines.size());
+
+    // insert the lines into text list and update index_size list
+    vector<pair<size_t, size_t>> index_and_size_list;
     for (size_t idx = 0; idx < limit; ++idx)
     {
         Text current_text;
         current_text.name = move(lines[idx]);
         
-        if (!current_text.name.empty())
+        size_t text_length = current_text.name.size();
+        if (text_length > 0)
         {
-            size_t text_length = current_text.name.size();
             text_min_len_ = min(text_length, text_min_len_);
             text_max_len_ = max(text_length, text_max_len_);
+            index_and_size_list.push_back(make_pair(idx, text_length));
 
             // calculate segment positions
             CalcSegPosition(text_length, current_text.seg_pos);
-            
-            // build trie tree
-            for (size_t pos = 0; pos < SEGMENT_NUM; ++pos)
-            {
-                size_t start = ((pos == 0)? 0 : current_text.seg_pos[pos-1]);
-                size_t end = ((pos == SEGMENT_NUM - 1)? text_length : current_text.seg_pos[pos]);
-                if (start == end)
-                    continue;
-                //cout << "Update name " << start << " " << end << " " << idx << " " << pos << " " << endl;
-                UpdateTextCandidate(current_text.name, start, end, idx, pos);
-            }
         }
 
         text_.push_back(current_text);
     }
-    
-    return SUCCESS;
-}
 
-int FFSearch::Search(string const& query, size_t threshold, vector<SearchResult> &result) const
-{
-    if (query.empty())
-        return SUCCESS;
-    
-    if (threshold > MAX_EDIT_DISTANCE)
-        threshold = MAX_EDIT_DISTANCE;
-    
-    SearchResultDict resultCandidate;
-    resultCandidate.reserve(128);
-    
-    int ret = Search(query, threshold, resultCandidate);
-    
-    if (ret == FAILURE)
-        return ret;
-    
-    // copy candidates to result
-    for (auto it = resultCandidate.begin(); it != resultCandidate.end(); ++it)
+    // sort the index_size list by size
+    sort(index_and_size_list.begin(), index_and_size_list.end(), [ ](pair<size_t, size_t> const& lhs, pair<size_t, size_t> const& rhs)
     {
-        result.push_back(move(it->second));
+       return lhs.second < rhs.second;
+    });
+
+    for (auto it = index_and_size_list.begin(); it != index_and_size_list.end(); ++it)
+    {
+        size_t idx = it->first;
+        size_t text_length = it->second;
+
+        Text const& current_text = text_[idx];
+
+        // build trie tree
+        for (size_t pos = 0; pos < SEGMENT_NUM; ++pos)
+        {
+            size_t start = ((pos == 0)? 0 : current_text.seg_pos[pos-1]);
+            size_t end = ((pos == SEGMENT_NUM - 1)? text_length : current_text.seg_pos[pos]);
+            if (start == end)
+                continue;
+            // cout << "Update name " << start << " " << end << " " << idx << " " << pos << " " << endl;
+            UpdateTextCandidate(current_text.name, start, end, idx, pos);
+        }
     }
     
     return SUCCESS;
@@ -154,8 +148,14 @@ size_t FFSearch::GetSize() const
     return text_.size();
 }
 
-int FFSearch::Search(string const& query, size_t threshold, SearchResultDict &resultCandidate) const
+int FFSearch::Search(string const& query, size_t threshold, vector<SearchResult> &result) const
 {
+    if (query.empty())
+        return SUCCESS;
+    
+    if (threshold > MAX_EDIT_DISTANCE)
+        threshold = MAX_EDIT_DISTANCE;
+
     size_t query_len = query.size();
 
     size_t seg_pos[MAX_EDIT_DISTANCE];
@@ -169,53 +169,51 @@ int FFSearch::Search(string const& query, size_t threshold, SearchResultDict &re
     
     static const int delta_end_only[] = {-1, 0, 1};
     
+    unordered_set<size_t> processed_id;
+    processed_id.reserve(1024);
     for (int i = 0; i < 3; ++i)
     {
         size_t middle_start = Adjust(seg_pos[0], delta_start_only[i], 0, query_len);
         
         TextCandidate const* left_node = GetTextCandidate(query, 0, middle_start);
-        
-        if (left_node != NULL)
+        if (left_node == NULL) continue;
+
+        size_t start = left_node->GetLeftStart();
+        size_t end = left_node->GetLeftEnd();
+        if (start == end) continue;
+
+
+        start = LowerBound(left_node, start, end, query_len, threshold);
+        //cout << end - start << " candidates found in left node." << endl;
+        for (size_t pi = start ; pi < end; pi++)
         {
-            for (size_t pi = left_node->GetLeftStart() ; pi < left_node->GetLeftEnd() ; pi++)
-            {
-                size_t textId = left_node->text_candidates_[pi];
-                Text const & text = text_[textId];
+            size_t textId = left_node->text_candidates_[pi];
+            Text const & text = text_[textId];
 
-                size_t text_len = text.name.size();
-                size_t text_middle_start = text.seg_pos[0];
-                
-                if (Diff(text_len, query_len) > threshold)
-                    continue;
+            size_t text_len = text.name.size();
+            
+            if (Diff(text_len, query_len) > threshold) continue;
 
-                auto it = resultCandidate.find(textId);
-                
-                if (it != resultCandidate.end())
-                    continue;
-                
-                size_t dist = CalcEditDistance(
-                    text.name, 
-                    text_middle_start, 
-                    text_len - text_middle_start, 
-                    query, 
-                    middle_start, 
-                    query_len - middle_start);
+            size_t text_middle_start = text.seg_pos[0];
+            size_t dist = CalcEditDistance(
+                text.name, 
+                text_middle_start, 
+                text_len - text_middle_start, 
+                query, 
+                middle_start, 
+                query_len - middle_start);
 
-                //cout << dist;
-                if (dist <= threshold)
-                {
-                    SearchResult er = SearchResult{
-                        textId, 
-                        dist,
-                        text.name
-                    };
+            if (dist > threshold) continue;
 
-                    resultCandidate.insert({textId, er});
-                    //cout << start << " " << end << " " << " left:";
-                    //cout << query.substr(start, end-start) << " dist:" << dist << endl;
-                }
-            }
+            if (!processed_id.insert(textId).second) continue;
 
+            result.push_back(SearchResult{
+                textId, 
+                dist,
+                text.name
+            });
+            //cout << start << " " << end << " " << " left:";
+            //cout << query.substr(start, end-start) << " dist:" << dist << endl;
         }
     }
     
@@ -226,46 +224,44 @@ int FFSearch::Search(string const& query, size_t threshold, SearchResultDict &re
     {
         size_t middle_end = Adjust(seg_pos[1], delta_end_only[i], 0, query_len);
         TextCandidate const* right_node = GetTextCandidate(query, middle_end, query_len);
+        if (right_node == NULL) continue;
+
+        size_t start = right_node->GetRightStart();
+        size_t end = right_node->GetRightEnd();
+        if (start == end) continue;
         
-        if (right_node != NULL)
+        start = LowerBound(right_node, start, end, query_len, threshold);
+        //cout << end - start << " candidates found in right node." << endl;
+        for (size_t pi = start ; pi < end; pi++)
         {
-            for (size_t pi = right_node->GetRightStart() ; pi < right_node->GetRightEnd() ; pi++)
-            {
-                size_t textId = right_node->text_candidates_[pi];
-                Text const & text = text_[textId];
+            size_t textId = right_node->text_candidates_[pi];
+            Text const & text = text_[textId];
 
-                size_t text_len = text.name.size();
-                size_t text_middle_end = text.seg_pos[1];
+            size_t text_len = text.name.size();
 
-                if (Diff(text_len, query_len) > threshold)
-                    continue;
+            if (Diff(text_len, query_len) > threshold) continue;
+            
+            size_t text_middle_end = text.seg_pos[1];
+            size_t dist = CalcEditDistance(
+                text.name, 
+                0, 
+                text_middle_end, 
+                query, 
+                0, 
+                middle_end);
 
-                auto it = resultCandidate.find(textId);
-                
-                if (it != resultCandidate.end())
-                    continue;
-                
-                size_t dist = CalcEditDistance(
-                    text.name, 
-                    0, 
-                    text_middle_end, 
-                    query, 
-                    0, 
-                    middle_end);
+            //cout << dist;
+            if (dist > threshold) continue;
 
-                //cout << dist;
-                if (dist <= threshold)
-                {
-                    SearchResult er = SearchResult{
-                        textId, 
-                        dist,
-                        text.name
-                    };
-                    resultCandidate.insert({textId, er});
-                    //cout << start << " " << end << " " << " right:";
-                    //cout << query.substr(start, end-start) << " dist:" << dist << endl;
-                }
-            }
+            if (!processed_id.insert(textId).second) continue;
+
+            result.push_back(SearchResult{
+                textId, 
+                dist,
+                text.name
+            });
+            //cout << start << " " << end << " " << " right:";
+            //cout << query.substr(start, end-start) << " dist:" << dist << endl;
         }
     }
     
@@ -277,73 +273,93 @@ int FFSearch::Search(string const& query, size_t threshold, SearchResultDict &re
         size_t middle_start = Adjust(seg_pos[0], delta_start[i], 0, query_len);
         size_t middle_end = Adjust(seg_pos[1], delta_len[i], 0, query_len);
         TextCandidate const* middle_node = GetTextCandidate(query, middle_start, middle_end);
+        if (middle_node == NULL) continue;
+
+        size_t start = middle_node->GetMiddleStart();
+        size_t end = middle_node->GetMiddleEnd();
+        if (start == end) continue;
         
-        if (middle_node != NULL)
+        start = LowerBound(middle_node, start, end, query_len, threshold);
+        //cout << end - start << " candidates found in middle node." << endl;
+
+        for (size_t pi = start; pi < end; pi++)
         {
-            for (size_t pi = middle_node->GetMiddleStart() ; pi < middle_node->GetMiddleEnd() ; pi++)
-            {
-                size_t textId = middle_node->text_candidates_[pi];
-                Text const & text = text_[textId];
+            size_t textId = middle_node->text_candidates_[pi];
+            Text const & text = text_[textId];
 
-                size_t text_len = text.name.size();
-                size_t text_middle_start = text.seg_pos[0];
-                size_t text_middle_end = text.seg_pos[1];
-                
-                if (Diff(text_len, query_len) > MAX_EDIT_DISTANCE)
-                    continue;
-
-                auto it = resultCandidate.find(textId);
-                
-                if (it != resultCandidate.end())
-                    continue;
-                
-                size_t dist_bwd = CalcEditDistance(
-                    text.name, 
-                    0, 
-                    text_middle_start, 
-                    query, 
-                    0, 
-                    middle_start);
+            size_t text_len = text.name.size();
             
-                size_t dist_fwd = CalcEditDistance(
-                    text.name, 
-                    text_middle_end, 
-                    text_len - text_middle_end, 
-                    query, 
-                    middle_end, 
-                    query_len-middle_end);
-                                
-                if (dist_bwd + dist_fwd <= MAX_EDIT_DISTANCE)
-                {
-                    SearchResult er = SearchResult{
-                        textId, 
-                        dist_bwd + dist_fwd,
-                        text.name
-                    };
-                    resultCandidate.insert({textId, er});
-                }
-            }
+            if (Diff(text_len, query_len) > threshold) continue;
+
+            size_t text_middle_start = text.seg_pos[0];
+            size_t text_middle_end = text.seg_pos[1];
+            size_t dist_bwd = CalcEditDistance(
+                text.name, 
+                0, 
+                text_middle_start, 
+                query, 
+                0, 
+                middle_start);
+
+            if (dist_bwd > threshold) continue;
+        
+            size_t dist_fwd = CalcEditDistance(
+                text.name, 
+                text_middle_end, 
+                text_len - text_middle_end, 
+                query, 
+                middle_end, 
+                query_len-middle_end);
+                            
+            if (dist_bwd + dist_fwd > threshold) continue;
+
+            if (!processed_id.insert(textId).second) continue;
+
+            result.push_back(SearchResult{
+                textId, 
+                dist_bwd + dist_fwd,
+                text.name
+            });
         }
     }
     
     return SUCCESS;
 }
 
-void FFSearch::Clear()
-{
-    text_min_len_ = -1;
-    text_max_len_ = 0; 
-    text_.clear();
-}
-
-TextCandidate * FFSearch::GetTextCandidate(const std::string& key, size_t start, size_t end) const
+TextCandidate const* FFSearch::GetTextCandidate(const std::string& key, size_t start, size_t end) const
 {
     auto it = da_.find(key.substr(start, end-start));
     if (it != da_.end())
-        return data_[it->second];
+        return &(data_[it->second]);
     else
         return NULL;
 }
+
+size_t FFSearch::LowerBound(TextCandidate const* node, size_t start, size_t end, size_t size_value, size_t threshold) const
+{
+    assert(start < end <= node->text_candidates_.size());
+    size_t size_value_lower_bound = (size_value > threshold) ? (size_value - threshold) : 0;
+
+    size_t count = end - start;
+    size_t current, step;
+    while (count > 0) {
+        current = start; 
+        step = count / 2; 
+        current += step;
+        if (text_[node->text_candidates_[current]].name.size() < size_value_lower_bound)
+        {
+            start = ++current; 
+            count -= step + 1; 
+        }
+        else
+        {
+            count = step;
+        }
+    }
+
+    return start;
+}
+
 
 void FFSearch::UpdateTextCandidate(const std::string& key, size_t start, size_t end, size_t idx, size_t pos)
 {
@@ -356,7 +372,7 @@ void FFSearch::UpdateTextCandidate(const std::string& key, size_t start, size_t 
     {
         i = data_.size();
         da_[subs] = i;
-        data_.push_back(new TextCandidate());
+        data_.push_back(TextCandidate());
     }
     else
     {
@@ -365,11 +381,11 @@ void FFSearch::UpdateTextCandidate(const std::string& key, size_t start, size_t 
     
     //cout << "Update node with " << i << " data size" << data.size() << endl;
     if (pos == 0)
-        data_[i]->AddLeft(idx);
+        data_[i].AddLeft(idx);
     else if (pos == SEGMENT_NUM - 1)
-        data_[i]->AddRight(idx);
+        data_[i].AddRight(idx);
     else
-        data_[i]->AddMiddle(idx);
+        data_[i].AddMiddle(idx);
     
     //cout << "Update node done." << endl;
 }
@@ -378,9 +394,6 @@ int FFSearch::CalcEditDistance(string const& doc1, int offset1, int len1, string
 {
     
     //cout << doc1 << ":" << doc1.substr(offset1, len1) << "<==>" << doc2 << ":" << doc2.substr(offset2, len2);
-
-    if (Diff(len1, len2) > MAX_EDIT_DISTANCE)
-        return MAX_EDIT_DISTANCE+1;
 
     int bot = 1;
     int top = EDIT_DISTANCE_ARRAY_LEN - 1;

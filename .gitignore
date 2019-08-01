@@ -33,3 +33,6 @@
 
 # Test data
 test_data/*.txt
+
+# vscode
+.vscode

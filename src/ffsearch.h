@@ -25,9 +25,6 @@ struct SearchResult
     std::string name;
 };
 
-// This is a mapping from text id to corresponding search results
-typedef std::unordered_map<size_t, SearchResult> SearchResultDict;
-
 // The structure of a text string and and its segmentation positions
 struct Text
 {
@@ -57,10 +54,13 @@ public:
     FFSearch();
     ~FFSearch();
 
+    // create index from text
     int CreateIndex(std::vector<std::string> && lines);
 
+    // Search for a text query in the texts, the edit distance is at most threshold
     int Search(std::string const& query, size_t threshold, std::vector<SearchResult> &result) const;
 
+    // get the number of text
     size_t GetSize() const;
     
 private:
@@ -74,7 +74,7 @@ private:
     std::vector<Text> text_;
     
     // list of text candidates
-    std::vector<TextCandidate *> data_;
+    std::vector<TextCandidate> data_;
 
     // the mapping of text segments to the text candidates,
     // each text candidate structure contains the IDs of those texts 
@@ -82,17 +82,14 @@ private:
     std::unordered_map<std::string, int> da_;
     
 private:
-    // Search for a text query in the texts, the edit distance is at most threshold
-    int Search(std::string const& query, size_t threshold, SearchResultDict &result) const;
-    
-    // Clear all texts
-    void Clear();
-    
     // Get the text candidates for a segment of the query string
-    TextCandidate * GetTextCandidate(const std::string& key, size_t start, size_t end) const;
+    TextCandidate const* GetTextCandidate(std::string const& key, size_t start, size_t end) const;
+
+    // Get the lowerbound index of text candidates according to text length
+    size_t LowerBound(TextCandidate const* node, size_t start, size_t end, size_t size_value, size_t threshold) const;
     
     // Update the text candidate structure during loading
-    void UpdateTextCandidate(const std::string& key, size_t start, size_t end, size_t idx, size_t pos);
+    void UpdateTextCandidate(std::string const& key, size_t start, size_t end, size_t idx, size_t pos);
 
     static int CalcEditDistance(std::string const& doc1, int offset1, int len1, std::string const& doc2, int offset2, int len2);
     static void CalcSegPosition(size_t len, size_t *seg_pos);

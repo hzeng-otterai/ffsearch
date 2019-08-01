@@ -3,13 +3,13 @@
 ## Usage
 `cd src`  
 `make`  
-`./ffsearch query.txt dictionary.txt`   
+`./ffsearch <query_file_name> <dictionary_file_name>`   
 
 ## Example data
 `cd test_data`  
 `./download_data.sh`  
 `../src/ffsearch noisy_entity.txt entity_name_unique.txt`  
-`../src/ffsearch noisy_query_en_1000.txt ../test_data/frequency_dictionary_en_500_000.txt`  
+`../src/ffsearch noisy_query_en_1000.txt frequency_dictionary_en_500_000.txt`  
 
 
 ## Benchmark

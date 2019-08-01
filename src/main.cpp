@@ -32,14 +32,18 @@ vector<string> get_lines(const char * file_name)
 
 int main(int argc, char **argv)
 {
-    if (argc != 3)
+    if (argc != 3 && argc != 4)
     {
-        cout << "Usage: ffsearch <query_file> <dictionary_file>" << endl << endl;
+        cout << "Usage: ffsearch <query_file> <dictionary_file> <iterations>" << endl << endl;
         return 0;
     }
 
     vector<string> query_lines = get_lines(argv[1]);
     vector<string> dictionary_lines = get_lines(argv[2]);
+
+    int iterations = 1000;
+    if (argc == 4)
+        iterations = stoi(argv[3]);
 
     FFSearch ts;
 
@@ -56,7 +60,6 @@ int main(int argc, char **argv)
     size_t nb_queries = query_lines.size();
     std::vector<std::vector<SearchResult>> extract_results(nb_queries);
 
-    int iterations = 1000;
     for (size_t i = 0; i < nb_queries; i++)
     {
         extract_results[i].reserve(128);
@@ -74,7 +77,7 @@ int main(int argc, char **argv)
 
     for(size_t i = 0; i < nb_queries; ++i)
     {
-        cout << "Results for query: " << query_lines[i] << "(" << extract_results[i].size() << ")" << endl;
+        cout << extract_results[i].size() << " results for query: " << query_lines[i] << endl;
         for(size_t j = 0; j < extract_results[i].size(); j++)
         {
             cout << "  " << extract_results[i][j].name << "\t" << extract_results[i][j].dist << endl;
