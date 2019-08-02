@@ -161,14 +161,16 @@ int FFSearch::Search(string const& query, size_t threshold, vector<SearchResult>
     size_t seg_pos[MAX_EDIT_DISTANCE];
     CalcSegPosition(query_len, seg_pos);
     
-    //delta of the middle segment
+    //delta of the first segment
     static const int delta_start_only[] = {-1, 0, 1};
-    
-    static const int delta_start[] = {-1,-1,  0, 0, 0, 1, 1};
-    static const int delta_len[]   = {-1, 0, -1, 0, 1, 0, 1};
-    
+
+    //delta of the last segment
     static const int delta_end_only[] = {-1, 0, 1};
     
+    //delta of the middle segment
+    static const int delta_start[] = {-1,  0,  0, 0,  1};
+    static const int delta_len[]   = { 1, -1,  0, 1, -1};
+
     unordered_set<size_t> processed_id;
     processed_id.reserve(1024);
     for (int i = 0; i < 3; ++i)

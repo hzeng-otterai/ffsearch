@@ -74,6 +74,8 @@ int main(int argc, char **argv)
     int time_spent = get_time() - start_time;
 
     cout << "Search done. " <<  (double)time_spent / iterations / query_lines.size() << " ms each query" << endl;
+    cout << "Press any key to show results." << endl;
+    getchar();
 
     for(size_t i = 0; i < nb_queries; ++i)
     {
