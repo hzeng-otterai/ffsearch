@@ -12,7 +12,7 @@ namespace ffsearch {
 
 const int SUCCESS = 0;
 const int FAILURE = 1;
-const size_t MAX_EDIT_DISTANCE = 2;
+const size_t MAX_EDIT_DISTANCE = 2;  // currently the code only works for value 2
 const size_t SEGMENT_NUM = MAX_EDIT_DISTANCE + 1;
 const size_t EDIT_DISTANCE_ARRAY_LEN = 2 * MAX_EDIT_DISTANCE + 3;
 const size_t MIN_SEGMENT_LEN = 1;
@@ -92,6 +92,11 @@ private:
     static void CalcSegPosition(size_t len, size_t *seg_pos);
     static size_t Diff(size_t, size_t);
     static size_t Adjust(size_t, int, size_t, size_t);
+
+    static int const* GetPossiblePrefixPosition(size_t mod);
+    static int const* GetPossibleSuffixPosition(size_t mod);
+    static int const* GetPossibleInfixStartPosition(size_t mod);
+    static int const* GetPossibleInfixEndPosition(size_t mod);
 };
 
 } 

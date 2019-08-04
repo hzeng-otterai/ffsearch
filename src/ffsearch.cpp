@@ -133,8 +133,7 @@ int FFSearch::CreateIndex(vector<string> && lines)
         {
             size_t start = ((pos == 0)? 0 : current_text.seg_pos[pos-1]);
             size_t end = ((pos == SEGMENT_NUM - 1)? text_length : current_text.seg_pos[pos]);
-            if (start == end)
-                continue;
+
             // cout << "Update name " << start << " " << end << " " << idx << " " << pos << " " << endl;
             UpdateTextCandidate(current_text.name, start, end, idx, pos);
         }
@@ -157,23 +156,19 @@ int FFSearch::Search(string const& query, size_t threshold, vector<SearchResult>
         threshold = MAX_EDIT_DISTANCE;
 
     size_t query_len = query.size();
+    size_t mod = query_len % SEGMENT_NUM;
 
     size_t seg_pos[MAX_EDIT_DISTANCE];
     CalcSegPosition(query_len, seg_pos);
-    
-    //delta of the first segment
-    static const int delta_start_only[] = {-1, 0, 1};
 
-    //delta of the last segment
-    static const int delta_end_only[] = {-1, 0, 1};
+    int const* delta_start_only = GetPossiblePrefixPosition(mod);
+    int const* delta_end_only = GetPossibleSuffixPosition(mod);
+    int const* delta_middle_start = GetPossibleInfixStartPosition(mod);
+    int const* delta_middle_end = GetPossibleInfixEndPosition(mod);
     
-    //delta of the middle segment
-    static const int delta_start[] = {-1,  0,  0, 0,  1};
-    static const int delta_len[]   = { 1, -1,  0, 1, -1};
-
     unordered_set<size_t> processed_id;
     processed_id.reserve(1024);
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; delta_start_only[i] <= 1; ++i)
     {
         size_t middle_start = Adjust(seg_pos[0], delta_start_only[i], 0, query_len);
         
@@ -220,7 +215,7 @@ int FFSearch::Search(string const& query, size_t threshold, vector<SearchResult>
     
     if (threshold == 0) return SUCCESS;
     
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; delta_end_only[i] <= 1; ++i)
     {
         size_t middle_end = Adjust(seg_pos[1], delta_end_only[i], 0, query_len);
         TextCandidate const* right_node = GetTextCandidate(query, middle_end, query_len);
@@ -267,10 +262,10 @@ int FFSearch::Search(string const& query, size_t threshold, vector<SearchResult>
     
     if (threshold == 1) return SUCCESS;
     
-    for (int i = 0; i < 7; ++i)
+    for (int i = 0; delta_middle_start[i] <= 1; ++i)
     {
-        size_t middle_start = Adjust(seg_pos[0], delta_start[i], 0, query_len);
-        size_t middle_end = Adjust(seg_pos[1], delta_len[i], 0, query_len);
+        size_t middle_start = Adjust(seg_pos[0], delta_middle_start[i], 0, query_len);
+        size_t middle_end = Adjust(seg_pos[1], delta_middle_end[i], 0, query_len);
         TextCandidate const* middle_node = GetTextCandidate(query, middle_start, middle_end);
         if (middle_node == NULL) continue;
 
@@ -439,9 +434,9 @@ void FFSearch::CalcSegPosition(size_t len, size_t *seg_pos)
     {
         size_t current_seg_len;
         if (i <= mod)
-            current_seg_len = max(seglen + 1, MIN_SEGMENT_LEN);
+            current_seg_len = seglen + 1;
         else
-            current_seg_len = max(seglen, MIN_SEGMENT_LEN);
+            current_seg_len = seglen;
         
         size_t remaining_seg_len = len - pos[i-1];
         current_seg_len = min(current_seg_len, remaining_seg_len);
@@ -464,3 +459,47 @@ size_t FFSearch::Adjust(size_t value, int delta, size_t lower, size_t upper)
 {
     return min(upper, size_t(max(int(lower), int(value) + delta)));
 }
+
+int const* FFSearch::GetPossiblePrefixPosition(size_t mod)
+{
+    //delta of the first segment
+    static const int mod0[] = {0, 1, 9999};
+    static const int mod1[] = {-1, 0, 9999};
+    static const int mod2[] = {-1, 0, 1, 9999};
+    if (mod == 0) return mod0;
+    else if (mod == 1) return mod1;
+    else return mod2;
+}
+
+int const* FFSearch::GetPossibleSuffixPosition(size_t mod)
+{
+    //delta of the last segment
+    static const int mod0[] = {0, 1, 9999};
+    static const int mod1[] = {-1, 0, 1, 9999};
+    static const int mod2[] = {-1, 0, 9999};
+    if (mod == 0) return mod0;
+    else if (mod == 1) return mod1;
+    else return mod2;
+}
+
+int const* FFSearch::GetPossibleInfixStartPosition(size_t mod)
+{
+    //delta of the middle segment
+    static const int mod0[] = {-1, 0, 0, 1, 1, 9999};
+    static const int mod1[] = {-1, -1, 0, 0, 1, 9999};
+    static const int mod2[] = {-1, 0, 0, 1, 1, 9999};
+    if (mod == 0) return mod0;
+    else if (mod == 1) return mod1;
+    else return mod2;
+}
+
+int const* FFSearch::GetPossibleInfixEndPosition(size_t mod)
+{
+    static const int mod0[] = {-1, 0, 1, 0, 1, 9999};
+    static const int mod1[] = {-1, 0, 0, 1, 1, 9999};
+    static const int mod2[] = {-1, -1, 0, 0, 1, 9999};
+    if (mod == 0) return mod0;
+    else if (mod == 1) return mod1;
+    else return mod2;
+}
+

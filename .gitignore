@@ -30,6 +30,10 @@
 *.exe
 *.out
 *.app
+ffsearch
+
+# Temp directory
+temp
 
 # Test data
 test_data/*.txt

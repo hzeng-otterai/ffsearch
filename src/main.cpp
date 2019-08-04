@@ -79,10 +79,10 @@ int main(int argc, char **argv)
 
     for(size_t i = 0; i < nb_queries; ++i)
     {
-        cout << extract_results[i].size() << " results for query: " << query_lines[i] << endl;
+        //cout << extract_results[i].size() << " results for query: " << query_lines[i] << endl;
         for(size_t j = 0; j < extract_results[i].size(); j++)
         {
-            cout << "  " << extract_results[i][j].name << "\t" << extract_results[i][j].dist << endl;
+            cout << query_lines[i] << "\t" << extract_results[i][j].name << "\t" << extract_results[i][j].dist << endl;
         }
     }
 
