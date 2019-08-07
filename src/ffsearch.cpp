@@ -13,69 +13,78 @@
 using namespace std;
 using namespace ffsearch;
 
-TextCandidate::TextCandidate():
-    text_candidates_(3, 3)
+TextCandidate::TextCandidate()
 {
-    // The list of text candidates has 3 columns, but they are saved in one vector,
-    // using the first 3 elements as the starting position of each column.
-    // When the text candidates are empty, the vector contains 3 elements and each has value 3
 }
 
-void TextCandidate::AddLeft(uint32_t id)
+void TextCandidate::Add(uint32_t id)
 {
-    // insert an element to the first position of "left" column
-    auto it = text_candidates_.begin() + text_candidates_[0];
-    text_candidates_.insert(it, id);
-    ++text_candidates_[0];
-    ++text_candidates_[1];
-    ++text_candidates_[2];
+    candidates_.push_back(id);
 }
 
-void TextCandidate::AddMiddle(uint32_t id)
+uint32_t TextCandidate::GetStart() const
 {
-    // insert an element to the first position of "middle" column
-    auto it = text_candidates_.begin() + text_candidates_[1];
-    text_candidates_.insert(it, id);
-    ++text_candidates_[1];
-    ++text_candidates_[2];
+    return 0;
 }
 
-void TextCandidate::AddRight(uint32_t id)
+uint32_t TextCandidate::GetEnd() const
 {
-    // insert an element to the first position of "right" column
-    auto it = text_candidates_.begin() + text_candidates_[2];
-    text_candidates_.insert(it, id);
-    ++text_candidates_[2];
+    return candidates_.size();
 }
 
-uint32_t TextCandidate::GetLeftStart() const
+void TextCandidateDict::Update(string const& key, size_t start, size_t end, uint32_t text_id, size_t pos)
 {
-    // "left" column always starts from 3
-    return 3;
-}
-uint32_t TextCandidate::GetMiddleStart() const
-{
-    // "middle" column
-    return text_candidates_[0];
-}
-uint32_t TextCandidate::GetRightStart() const
-{
-    // "right" column
-    return text_candidates_[1];
-}
-uint32_t TextCandidate::GetLeftEnd() const
-{
-    return text_candidates_[0];
-}
-uint32_t TextCandidate::GetMiddleEnd() const
-{
-    return text_candidates_[1];
-}
-uint32_t TextCandidate::GetRightEnd() const
-{
-    return text_candidates_[2];
+    string subs = key.substr(start, end-start);
+    if (pos == 0)
+    {
+        auto it = left_.find(subs);
+        if (it == left_.end())
+            it = left_.insert(make_pair(subs, TextCandidate())).first;
+        
+        it->second.Add(text_id);
+    }
+    else if (pos == MAX_EDIT_DISTANCE)
+    {
+        auto it = right_.find(subs);
+        if (it == right_.end())
+            it = right_.insert(make_pair(subs, TextCandidate())).first;
+        
+        it->second.Add(text_id);
+    }
+    else
+    {
+        auto it = middle_.find(subs);
+        if (it == middle_.end())
+            it = middle_.insert(make_pair(subs, TextCandidate())).first;
+        
+        it->second.Add(text_id);
+    }
 }
 
+TextCandidate const* TextCandidateDict::Get(string const& key, size_t start, size_t end, size_t pos) const
+{
+    string subs = key.substr(start, end-start);
+    if (pos == 0)
+    {
+        auto it = left_.find(subs);
+        if (it != left_.end())
+            return &(it->second);
+    }
+    else if (pos == MAX_EDIT_DISTANCE)
+    {
+        auto it = right_.find(subs);
+        if (it != right_.end())
+            return &(it->second);
+    }
+    else
+    {
+        auto it = middle_.find(subs);
+        if (it != middle_.end())
+            return &(it->second);
+    }
+
+    return NULL;
+}
 
 FFSearch::FFSearch() :
     text_min_len_(-1), 
@@ -95,7 +104,8 @@ int FFSearch::CreateIndex(vector<string> && lines)
     size_t limit = min(size_t(UINT32_MAX), lines.size());
 
     // insert the lines into text list and update index_size list
-    vector<pair<size_t, size_t>> index_and_size_list;
+    typedef pair<uint32_t, size_t> IndexSize;
+    vector<IndexSize> index_and_size_list;
     for (size_t idx = 0; idx < limit; ++idx)
     {
         Text current_text;
@@ -106,7 +116,7 @@ int FFSearch::CreateIndex(vector<string> && lines)
         {
             text_min_len_ = min(text_length, text_min_len_);
             text_max_len_ = max(text_length, text_max_len_);
-            index_and_size_list.push_back(make_pair(idx, text_length));
+            index_and_size_list.push_back(make_pair(uint32_t(idx), text_length));
 
             // calculate segment positions
             CalcSegPosition(text_length, current_text.seg_pos);
@@ -116,17 +126,17 @@ int FFSearch::CreateIndex(vector<string> && lines)
     }
 
     // sort the index_size list by size
-    sort(index_and_size_list.begin(), index_and_size_list.end(), [ ](pair<size_t, size_t> const& lhs, pair<size_t, size_t> const& rhs)
+    sort(index_and_size_list.begin(), index_and_size_list.end(), [ ](IndexSize const& lhs, IndexSize const& rhs)
     {
        return lhs.second < rhs.second;
     });
 
     for (auto it = index_and_size_list.begin(); it != index_and_size_list.end(); ++it)
     {
-        size_t idx = it->first;
+        uint32_t id = it->first;
         size_t text_length = it->second;
 
-        Text const& current_text = text_[idx];
+        Text const& current_text = text_[id];
 
         // build trie tree
         for (size_t pos = 0; pos < SEGMENT_NUM; ++pos)
@@ -134,8 +144,8 @@ int FFSearch::CreateIndex(vector<string> && lines)
             size_t start = ((pos == 0)? 0 : current_text.seg_pos[pos-1]);
             size_t end = ((pos == SEGMENT_NUM - 1)? text_length : current_text.seg_pos[pos]);
 
-            // cout << "Update name " << start << " " << end << " " << idx << " " << pos << " " << endl;
-            UpdateTextCandidate(current_text.name, start, end, idx, pos);
+            // cout << "Update name " << start << " " << end << " " << id << " " << pos << " " << endl;
+            da_.Update(current_text.name, start, end, id, pos);
         }
     }
     
@@ -172,18 +182,18 @@ int FFSearch::Search(string const& query, size_t threshold, vector<SearchResult>
     {
         size_t middle_start = Adjust(seg_pos[0], delta_start_only[i], 0, query_len);
         
-        TextCandidate const* left_node = GetTextCandidate(query, 0, middle_start);
+        TextCandidate const* left_node = da_.Get(query, 0, middle_start, 0);
         if (left_node == NULL) continue;
 
-        size_t start = left_node->GetLeftStart();
-        size_t end = left_node->GetLeftEnd();
+        size_t start = left_node->GetStart();
+        size_t end = left_node->GetEnd();
         if (start == end) continue;
 
-        start = LowerBound(left_node, start, end, query_len, threshold);
+        start = LowerBound(left_node->candidates_, start, end, query_len, threshold);
         //cout << end - start << " candidates found in left node." << endl;
         for (size_t pi = start; pi < end; pi++)
         {
-            size_t textId = left_node->text_candidates_[pi];
+            size_t textId = left_node->candidates_[pi];
             Text const & text = text_[textId];
 
             size_t text_len = text.name.size();
@@ -218,18 +228,18 @@ int FFSearch::Search(string const& query, size_t threshold, vector<SearchResult>
     for (int i = 0; delta_end_only[i] <= 1; ++i)
     {
         size_t middle_end = Adjust(seg_pos[1], delta_end_only[i], 0, query_len);
-        TextCandidate const* right_node = GetTextCandidate(query, middle_end, query_len);
+        TextCandidate const* right_node = da_.Get(query, middle_end, query_len, 2);
         if (right_node == NULL) continue;
 
-        size_t start = right_node->GetRightStart();
-        size_t end = right_node->GetRightEnd();
+        size_t start = right_node->GetStart();
+        size_t end = right_node->GetEnd();
         if (start == end) continue;
         
-        start = LowerBound(right_node, start, end, query_len, threshold);
+        start = LowerBound(right_node->candidates_, start, end, query_len, threshold);
         //cout << end - start << " candidates found in right node." << endl;
         for (size_t pi = start; pi < end; pi++)
         {
-            size_t textId = right_node->text_candidates_[pi];
+            size_t textId = right_node->candidates_[pi];
             Text const & text = text_[textId];
 
             size_t text_len = text.name.size();
@@ -266,19 +276,19 @@ int FFSearch::Search(string const& query, size_t threshold, vector<SearchResult>
     {
         size_t middle_start = Adjust(seg_pos[0], delta_middle_start[i], 0, query_len);
         size_t middle_end = Adjust(seg_pos[1], delta_middle_end[i], 0, query_len);
-        TextCandidate const* middle_node = GetTextCandidate(query, middle_start, middle_end);
+        TextCandidate const* middle_node = da_.Get(query, middle_start, middle_end, 1);
         if (middle_node == NULL) continue;
 
-        size_t start = middle_node->GetMiddleStart();
-        size_t end = middle_node->GetMiddleEnd();
+        size_t start = middle_node->GetStart();
+        size_t end = middle_node->GetEnd();
         if (start == end) continue;
         
-        start = LowerBound(middle_node, start, end, query_len, threshold);
+        start = LowerBound(middle_node->candidates_, start, end, query_len, threshold);
         //cout << end - start << " candidates found in middle node." << endl;
 
         for (size_t pi = start; pi < end; pi++)
         {
-            size_t textId = middle_node->text_candidates_[pi];
+            size_t textId = middle_node->candidates_[pi];
             Text const & text = text_[textId];
 
             size_t text_len = text.name.size();
@@ -320,18 +330,9 @@ int FFSearch::Search(string const& query, size_t threshold, vector<SearchResult>
     return SUCCESS;
 }
 
-TextCandidate const* FFSearch::GetTextCandidate(const std::string& key, size_t start, size_t end) const
+size_t FFSearch::LowerBound(vector<uint32_t> const& node, size_t start, size_t end, size_t size_value, size_t threshold) const
 {
-    auto it = da_.find(key.substr(start, end-start));
-    if (it != da_.end())
-        return &(it->second);
-    else
-        return NULL;
-}
-
-size_t FFSearch::LowerBound(TextCandidate const* node, size_t start, size_t end, size_t size_value, size_t threshold) const
-{
-    assert(start < end <= node->text_candidates_.size());
+    assert(start < end <= node.size());
     size_t size_value_lower_bound = (size_value > threshold) ? (size_value - threshold) : 0;
 
     size_t count = end - start;
@@ -340,7 +341,7 @@ size_t FFSearch::LowerBound(TextCandidate const* node, size_t start, size_t end,
         current = start; 
         step = count / 2; 
         current += step;
-        if (text_[node->text_candidates_[current]].name.size() < size_value_lower_bound)
+        if (text_[node[current]].name.size() < size_value_lower_bound)
         {
             start = ++current; 
             count -= step + 1; 
@@ -352,29 +353,6 @@ size_t FFSearch::LowerBound(TextCandidate const* node, size_t start, size_t end,
     }
 
     return start;
-}
-
-
-void FFSearch::UpdateTextCandidate(const std::string& key, size_t start, size_t end, size_t idx, size_t pos)
-{
-    string subs = key.substr(start, end-start);
-    auto it = da_.find(subs);
-
-    //cout << "Got i " << i << endl;
-    if (it == da_.end())
-    {
-        it = da_.insert(make_pair(subs, TextCandidate())).first;
-    }
-    
-    //cout << "Update node with " << i << " data size" << data.size() << endl;
-    if (pos == 0)
-        it->second.AddLeft(idx);
-    else if (pos == SEGMENT_NUM - 1)
-        it->second.AddRight(idx);
-    else
-        it->second.AddMiddle(idx);
-    
-    //cout << "Update node done." << endl;
 }
 
 int FFSearch::CalcEditDistance(string const& doc1, int offset1, int len1, string const& doc2, int offset2, int len2)

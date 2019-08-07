@@ -40,3 +40,6 @@ test_data/*.txt
 
 # vscode
 .vscode
+
+# Mac system folder
+.DS_Store

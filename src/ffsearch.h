@@ -15,7 +15,6 @@ const int FAILURE = 1;
 const size_t MAX_EDIT_DISTANCE = 2;  // currently the code only works for value 2
 const size_t SEGMENT_NUM = MAX_EDIT_DISTANCE + 1;
 const size_t EDIT_DISTANCE_ARRAY_LEN = 2 * MAX_EDIT_DISTANCE + 3;
-const size_t MIN_SEGMENT_LEN = 1;
 
 // This is the structure to store search results
 struct SearchResult
@@ -32,20 +31,25 @@ struct Text
     std::string name;
 };
 
-// The corresponding candidate text IDs for a text segment
 struct TextCandidate
 {
     TextCandidate();
-    void AddLeft(uint32_t);
-    void AddMiddle(uint32_t);
-    void AddRight(uint32_t);
-    uint32_t GetLeftStart() const;
-    uint32_t GetMiddleStart() const;
-    uint32_t GetRightStart() const;
-    uint32_t GetLeftEnd() const;
-    uint32_t GetMiddleEnd() const;
-    uint32_t GetRightEnd() const;
-    std::vector<uint32_t> text_candidates_;
+    void Add(uint32_t);
+    uint32_t GetStart() const;
+    uint32_t GetEnd() const;
+    std::vector<uint32_t> candidates_;
+};
+
+struct TextCandidateDict
+{
+    std::unordered_map<std::string, TextCandidate> left_;
+    std::unordered_map<std::string, TextCandidate> middle_;
+    std::unordered_map<std::string, TextCandidate> right_;
+
+    void Update(std::string const& key, size_t start, size_t end, uint32_t text_id, size_t pos);
+
+    // Get the text candidates for a segment of the query string
+    TextCandidate const* Get(std::string const& key, size_t start, size_t end, size_t pos) const;
 };
 
 class FFSearch 
@@ -76,14 +80,11 @@ private:
     // the mapping of text segments to the text candidates,
     // each text candidate structure contains the IDs of those texts 
     // containing the text segments as prefix, infix and suffix
-    std::unordered_map<std::string, TextCandidate> da_;
+    TextCandidateDict da_;
     
 private:
-    // Get the text candidates for a segment of the query string
-    TextCandidate const* GetTextCandidate(std::string const& key, size_t start, size_t end) const;
-
     // Get the lowerbound index of text candidates according to text length
-    size_t LowerBound(TextCandidate const* node, size_t start, size_t end, size_t size_value, size_t threshold) const;
+    size_t LowerBound(std::vector<uint32_t> const& node, size_t start, size_t end, size_t size_value, size_t threshold) const;
     
     // Update the text candidate structure during loading
     void UpdateTextCandidate(std::string const& key, size_t start, size_t end, size_t idx, size_t pos);
