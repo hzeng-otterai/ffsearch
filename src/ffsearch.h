@@ -86,9 +86,6 @@ private:
     // Get the lowerbound index of text candidates according to text length
     size_t LowerBound(std::vector<uint32_t> const& node, size_t start, size_t end, size_t size_value, size_t threshold) const;
     
-    // Update the text candidate structure during loading
-    void UpdateTextCandidate(std::string const& key, size_t start, size_t end, size_t idx, size_t pos);
-
     static int CalcEditDistance(std::string const& doc1, int offset1, int len1, std::string const& doc2, int offset2, int len2);
     static void CalcSegPosition(size_t len, size_t *seg_pos);
     static size_t Diff(size_t, size_t);
